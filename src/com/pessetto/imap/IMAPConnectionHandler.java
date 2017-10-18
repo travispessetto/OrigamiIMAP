@@ -31,8 +31,17 @@ public class IMAPConnectionHandler implements Runnable{
 			{
 				String response = commandHandler.GetResponseForClient(cmd);
 				outToClient.writeBytes(response);
-				System.out.println("Client("+threadNo+")> " + cmd);
-				System.out.print("Server("+threadNo+")> " + response);
+				String[] subCmds = cmd.split(Configuration.CRLF);
+				String[] subResponses = response.split(Configuration.CRLF);
+				for(String subCmd : subCmds)
+				{
+					System.out.println("Client("+threadNo+")> " + subCmd);
+				}
+				for(String subResponse : subResponses)
+				{
+					System.out.println("Server("+threadNo+")> " + subResponse);
+				}
+				System.out.println();
 			}
 		}
 		catch(Exception ex)

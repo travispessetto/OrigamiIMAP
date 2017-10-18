@@ -3,13 +3,23 @@ package com.pessetto.imap;
 public class IMAPCommandHandler 
 {
 	private IMAPState state;
+	private AuthenticateState authenticationState;
+	private String currentTag;
 	public IMAPCommandHandler()
 	{
 		state = IMAPState.NOT_AUTHENTICATED;
+		authenticationState = AuthenticateState.NOT_STARTED;
 	}
 	
 	public String GetResponseForClient(String command)
 	{
+		// things that must use previous tag
+		if(authenticationState == AuthenticateState.CHALLENGE)
+		{
+			authenticationState = AuthenticateState.FINISHED;
+			String response = currentTag + " OK Authentication Complete" + Configuration.CRLF;
+			return response;
+		}
 		String tag = GetTag(command);
 		command = command.toLowerCase();
 		if(state == IMAPState.NOT_AUTHENTICATED)
@@ -33,6 +43,12 @@ public class IMAPCommandHandler
 		{
 			state = IMAPState.LOGOUT;
 		}
+		if(command.contains("authenticate"))
+		{
+			authenticationState = AuthenticateState.CHALLENGE;
+			String response = "+ Ready for authentication" + Configuration.CRLF;
+			return response;
+		}
 		if(command.contains("capability"))
 		{
 			String response = "* CAPABILITY IMAPrev1 STARTLS AUTH=PLAIN LOGINDISABLED"+Configuration.CRLF;
@@ -50,6 +66,7 @@ public class IMAPCommandHandler
 	
 	private String GetTag(String cmd)
 	{
-		return cmd.split("\\s")[0];
+		currentTag = cmd.split("\\s")[0];
+		return currentTag;
 	}
 }
