@@ -1,5 +1,8 @@
 package com.pessetto.imap;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class IMAPCommandHandler 
 {
 	private IMAPState state;
@@ -17,6 +20,7 @@ public class IMAPCommandHandler
 		if(authenticationState == AuthenticateState.CHALLENGE)
 		{
 			authenticationState = AuthenticateState.FINISHED;
+			state = IMAPState.AUTHENTICATED;
 			String response = currentTag + " OK Authentication Complete" + Configuration.CRLF;
 			return response;
 		}
@@ -28,7 +32,55 @@ public class IMAPCommandHandler
 		}
 		if(state == IMAPState.AUTHENTICATED)
 		{
-			
+			if(command.contains("status"))
+			{
+				Pattern statusPattern = Pattern.compile("([^\\s\\(\\)\\\"]+)");
+				Matcher matcher = statusPattern.matcher(command);
+				matcher.find(2);
+				matcher.find();
+				String box = matcher.group();
+				String response = "* STATUS " + box + " (";
+				boolean first = true;
+				while(matcher.find())
+				{
+					if(!first)
+					{
+						response += " ";
+					}
+					else
+					{
+						first = false;
+					}
+					String item = matcher.group().toLowerCase();
+					if(item.contains("uidnext"))
+					{
+						// TODO: Generate an actual unique id
+						int uidnext = 0;
+						response += "UIDNEXT "+uidnext;
+					}
+					else if(item.contains("messages"))
+					{
+						// TODO: implement message count
+						int messageCount = 0;
+						response += "MESSAGES " + messageCount;
+					}
+					else if(item.contains("unseen"))
+					{
+						// TODO: implement unseen message count
+						int unseenCount = 0;
+						response += "UNSEEN " + unseenCount;
+					}
+					else if(item.contains("recent"))
+					{
+						// TODO: implement recent count
+						int recentCount = 0;
+						response += "RECENT " + recentCount;
+					}
+				}
+				response += ")"+Configuration.CRLF+tag+" OK STATUS completed";
+				response += Configuration.CRLF;
+				return response;
+			}
 		}
 		if(state == IMAPState.SELECTED)
 		{
@@ -51,7 +103,7 @@ public class IMAPCommandHandler
 		}
 		if(command.contains("capability"))
 		{
-			String response = "* CAPABILITY IMAPrev1 STARTLS AUTH=PLAIN LOGINDISABLED"+Configuration.CRLF;
+			String response = "* CAPABILITY IMAP4rev1 STARTLS AUTH=PLAIN"+Configuration.CRLF;
 			response += tag + " OK CAPABILITY completed" + Configuration.CRLF;
 			return response;
 		}
