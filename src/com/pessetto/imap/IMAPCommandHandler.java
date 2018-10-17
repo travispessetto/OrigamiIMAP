@@ -8,10 +8,14 @@ public class IMAPCommandHandler
 	private IMAPState state;
 	private AuthenticateState authenticationState;
 	private String currentTag;
+	private boolean starttlsRequested;
+	private boolean starttlsActivated;
 	public IMAPCommandHandler()
 	{
 		state = IMAPState.NOT_AUTHENTICATED;
 		authenticationState = AuthenticateState.NOT_STARTED;
+		starttlsRequested = false;
+		starttlsActivated = false;
 	}
 	
 	public String GetResponseForClient(String command)
@@ -81,6 +85,40 @@ public class IMAPCommandHandler
 				response += Configuration.CRLF;
 				return response;
 			}
+			else if(command.contains("select"))
+			{
+				// Placeholder
+				String response = "* 1 EXISTS"+Configuration.CRLF;
+				response += "* 0 RECENT"+Configuration.CRLF;
+				response += "* OK [UNSEEN 0]"+Configuration.CRLF;
+				response += "* OK [UIDNEXT 2] Predicted next UID"+Configuration.CRLF;
+				response += String.format("%s OK [READ-WRITE] SELECT complete" + Configuration.CRLF, tag);
+				return response;
+			}
+			else if(command.contains("uid"))
+			{
+				if(command.contains("fetch"))
+				{
+					String[] commandParts = command.split(" ");
+					String rangeStr = commandParts[3];
+					String[] ranges = rangeStr.split(":");
+					long minRange = Long.parseLong(ranges[0]);
+					long maxRange = 0;
+					if(ranges[1].contains("*"))
+					{
+						// This will be set to last UID in future because it should get all
+						maxRange = minRange;
+					}
+					else
+					{
+						maxRange = Long.parseLong(ranges[1]);
+					}
+					// This will need to be updated to show all messages unseen headers
+					String response = "* 1 FETCH (FLAGS (\\Seen UID 1))" + Configuration.CRLF;
+					response += String.format("%s OK UID FETCH completed", tag);
+					return response;
+				}
+			}
 		}
 		if(state == IMAPState.SELECTED)
 		{
@@ -103,7 +141,12 @@ public class IMAPCommandHandler
 		}
 		if(command.contains("capability"))
 		{
-			String response = "* CAPABILITY IMAP4rev1 STARTLS AUTH=PLAIN"+Configuration.CRLF;
+			String encryptionOptions = " STARTTLS ";
+			if(starttlsActivated)
+			{
+				encryptionOptions = "";
+			}
+			String response = String.format("* CAPABILITY IMAP4rev1 %s AUTH=PLAIN"+Configuration.CRLF,encryptionOptions);
 			response += tag + " OK CAPABILITY completed" + Configuration.CRLF;
 			return response;
 		}
@@ -113,7 +156,33 @@ public class IMAPCommandHandler
 			response += tag + " OK LOGOUT completed"+Configuration.CRLF;
 			return response;
 		}
+		if(command.contains("noop"))
+		{
+			String response = tag + " OK NOOP completed" + Configuration.CRLF;
+			return response;
+		}
+		if(command.contains("starttls"))
+		{
+			String response = String.format("%s OK Begin TLS negotiation now%s", tag,Configuration.CRLF);
+			starttlsRequested = true;
+			return response;
+		}
 		return tag+" BAD" + Configuration.CRLF;
+	}
+	
+	public boolean GetStartTLSRequested()
+	{
+		return starttlsRequested;
+	}
+	
+	public void SetStartTLSActivated(boolean value)
+	{
+		starttlsActivated = value;
+	}
+	
+	public void SetStartTLSRequested(boolean value)
+	{
+		starttlsRequested = value;
 	}
 	
 	private String GetTag(String cmd)
